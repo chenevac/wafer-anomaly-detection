@@ -1,2 +1,26 @@
-# industrial-vision-anomaly-detection
-A comparative study between analytical statistical models and deep normalizing flows for industrial defect detection.
+# wafer-anomaly-detection
+
+This project implements CS-Flow, a normalizing flow–based method designed for unsupervised industrial anomaly detection.
+
+pip install uv
+uv venv
+.venv\Scripts\activate
+uv init
+uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+uv pip install efficientnet_pytorch
+
+uv add torch torchvision
+uv add efficientnet_pytorch
+uv add FrEIA
+uv add PyYaml
+
+
+## References
+
+[1] T. Lei, B. Wang, S. Chen, S. Cao, and N. Zou,  
+*Texture-AD: An Anomaly Detection Dataset and Benchmark for Real Algorithm Development*,  
+arXiv preprint arXiv:2409.06367, 2024.
+
+[2] M. Rudolph, T. Wehrbein, B. Rosenhahn, and B. Wandt,  
+*Fully Convolutional Cross-Scale-Flows for Image-Based Defect Detection*,  
+Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision (WACV), 2022.

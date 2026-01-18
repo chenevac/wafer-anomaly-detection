@@ -1,0 +1,6 @@
+img_size: !!python/tuple
+  - 512
+  - 512
+n_coupling_blocks: 4
+clamp: 3
+fc_internal: 1024
