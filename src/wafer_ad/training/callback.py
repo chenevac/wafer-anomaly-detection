@@ -148,7 +148,7 @@ class ModelCheckpoint(Callback):
         self,
         dirpath: str,
         filename: str,
-        monitor: Optional[str] = None,
+        monitor: str = "val_loss",
         save_last: bool = False,
         mode: str = "min",
         every_n_epochs: Optional[int] = None,
@@ -157,8 +157,7 @@ class ModelCheckpoint(Callback):
         Args:
             dirpath: directory to save the model file.
             filename: checkpoint filename.
-            monitor: quantity to monitor. By default it is ``None`` which
-                saves a checkpoint only for the last epoch.
+            monitor: quantity to monitor. By default it is ``val_loss``.
             every_n_epochs: Number of epochs between checkpoints. This value
                 must be ``None`` or non-negative.
         """
