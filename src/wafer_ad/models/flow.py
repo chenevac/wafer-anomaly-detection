@@ -109,6 +109,7 @@ class MSFlowModel(nn.Module):
         super().__init__()
 
         self.pool_type = pool_type
+        self.c_conds = c_conds
 
         self.extractor, self.output_channels = ExtractorFactory.build(extractor_name)
         self.parallel_flows, self.fusion_flow = MSFlowFactory.build(self.output_channels, c_conds=c_conds, n_blocks=n_blocks)

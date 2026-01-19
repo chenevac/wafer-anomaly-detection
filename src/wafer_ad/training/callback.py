@@ -75,11 +75,11 @@ class EarlyStopping(Callback):
         self.mode = mode
         self.wait_count = 0
         self.min_delta *= 1 if self.mode == "max" else -1
-        self.best_score = np.Inf if self.mode == "min" else -np.Inf
+        self.best_score = np.inf if self.mode == "min" else -np.inf
 
     def reset_wait_count_and_best_score(self) -> None:
         self.wait_count = 0
-        self.best_score = np.Inf if self.mode == "min" else -np.Inf
+        self.best_score = np.inf if self.mode == "min" else -np.inf
 
     @property
     def monitor_op(self) -> Callable:
@@ -175,10 +175,10 @@ class ModelCheckpoint(Callback):
         self.current_version = self.STARTING_VERSION + 1
 
         self.mode = mode
-        self.best_score = np.Inf if self.mode == "min" else -np.Inf
+        self.best_score = np.inf if self.mode == "min" else -np.inf
 
     def reset_best_score(self) -> None:
-        self.best_score = np.Inf if self.mode == "min" else -np.Inf
+        self.best_score = np.inf if self.mode == "min" else -np.inf
 
     def _save_checkpoint(self, trainer, filepath: str) -> None:
         trainer.save_checkpoint(filepath)

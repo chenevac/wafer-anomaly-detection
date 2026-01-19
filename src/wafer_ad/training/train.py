@@ -7,11 +7,13 @@ import time
 from tqdm import tqdm
 from typing import Any, Dict, List, Optional, Union
 import torch
+from wafer_ad.data.dataloader import get_data_loaders
 from wafer_ad.models.flow import MSFlowModel
 from wafer_ad.training.callback import Callback, EarlyStopping, ModelCheckpoint
-from wafer_ad.training.loss import MSFlowLoss, msflow_loss
+from wafer_ad.training.loss import MSFlowLoss
 from wafer_ad.training.metric import AverageMeter
 from wafer_ad.utils.config import Config
+from wafer_ad.utils.constant import PROJECT_ROOT
 from wafer_ad.utils.devices import get_device
 from wafer_ad.utils.seed import init_seeds
 
@@ -52,18 +54,38 @@ class Trainer:
             torch.optim.lr_scheduler.MultiStepLR
         ]
         self.schedulers_kwargs: List[Dict[str, Any]] = [
-            {},
-            {},
+            # Warmup sur les 500 premiers steps
+            {
+                "start_factor": 0.1,
+                "end_factor": 1.0,
+                "total_iters": 500,
+            },
+            # Décroissance après certains steps
+            {
+                "milestones": [5_000, 10_000, 20_000],
+                "gamma": 0.1,
+            },
         ]
         
         self.callbacks: List[Callback] = [
-            ModelCheckpoint(...),
-            EarlyStopping(...),
+            ModelCheckpoint,
+            EarlyStopping,
+        ]
+        self.callbacks_kwargs: List[Dict[str, Any]] = [
+            {
+                "dirpath": os.path.join(PROJECT_ROOT, "output"),
+                "filename": "csflow",
+                "every_n_epochs": 4,
+            },
+            {
+                "monitor": "val_loss"
+            }
         ]
         
         self.loss_fn = MSFlowLoss()
         
-        self.metrics = [...]
+        self.metrics = []
+        self.metrics_kwargs = []
         self.metrics_history: Dict[str, List[float]]
         
         self.start, self.end = None, None
@@ -115,8 +137,28 @@ class Trainer:
                 for scheduler in self.schedulers:  # Update LR Schedulers
                     scheduler.step()
         self._update_train_metrics_history(total_loss.avg)    
-
         self._call_callbacks("on_train_epoch_end")
+        
+    def eval(self, dataloader: torch.utils.data.DataLoader) -> None:
+        """Evaluate the dataloader."""
+        self._call_callbacks("on_validation_epoch_start")
+        self.model.eval()
+        total_loss = AverageMeter()
+        self._reset_metrics()
+
+        if self.enable_progress_bar:
+            dataloader = tqdm(dataloader, total=len(dataloader))
+        for batch_idx, (images, _, _) in enumerate(dataloader):
+            images = images.to(self.device)
+            with torch.no_grad():
+                z_list, jac = self.model(images)  # Forward pass
+                loss = self.loss_fn(z_list, jac)
+                total_loss.update(loss.item(), n=images.size(0))
+                if self.enable_progress_bar:
+                    dataloader.set_description(f'loss: {total_loss.avg:.2f}')
+        self._update_val_metrics_history(total_loss.avg)
+        self._call_callbacks("on_validation_epoch_end")
+
 
     def _reset_metrics(self) -> None:
         """Reset all metrics."""
@@ -151,25 +193,13 @@ class Trainer:
                 }
             )
 
-    def eval(self, dataloader: torch.utils.data.DataLoader) -> None:
-        """Evaluate the dataloader."""
-        self._call_callbacks("on_validation_epoch_start")
-        self.model.eval()
-        total_loss = AverageMeter()
-        self._reset_metrics()
-
-        if self.enable_progress_bar:
-            dataloader = tqdm(dataloader, total=len(dataloader))
-        ...
-
-        
     def train(
         self,
         model: torch.nn.Module,
         train_dataloader: torch.utils.data.DataLoader,
         valid_dataloader: Optional[torch.utils.data.DataLoader],
         n_epochs: int = 100,
-        evaluate_every_n_epochs: int = 4,
+        evaluate_every_n_epochs: int = 1,
     ) -> None:
         """
         Runs the full optimization routine.
@@ -187,7 +217,7 @@ class Trainer:
             logging.warning("No validation dataloader specified for training. ☠️")
         self.on_fit_start(model)
         for _ in range(n_epochs):
-            self.fit_one_epoch(train_dataloader)
+            self.train_one_epoch(train_dataloader)
             if valid_dataloader is not None and (self.current_epoch % evaluate_every_n_epochs == 0):
                 self.eval(valid_dataloader)
             info_metric = " | ".join(
@@ -276,13 +306,19 @@ class Trainer:
             gradient_clip_val=source.gradient_clip_val,
             gradient_clip_norm_type=source.gradient_clip_norm_type,
         )
+    
       
-
       
 if __name__ == "__main__":
     init_seeds(42)
     project_root = Path(__file__).resolve().parents[3]
     model = MSFlowModel.from_config(os.path.join(project_root, "configs", "model.yaml"))
-    #trainer = Trainer.from_config()
-        
+    train_loader, val_loader, test_loader = get_data_loaders(idx_dataset=1)
+    trainer = Trainer()
+    
+    trainer.train(
+        model=model,
+        train_dataloader=train_loader,
+        valid_dataloader=val_loader,
+    )
 

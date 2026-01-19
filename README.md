@@ -14,6 +14,10 @@ uv add efficientnet_pytorch
 uv add FrEIA
 uv add PyYaml
 uv add tqdm
+uv add scikit-learn
+uv add scikit-image
+uv add torcheval
+
 
 
 ## References

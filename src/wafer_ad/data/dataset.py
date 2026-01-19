@@ -3,14 +3,15 @@ import os
 from PIL import Image
 import torch
 
-from pathlib import Path
 from typing import Tuple
 from torchvision import transforms
 
+from torch.utils.data import random_split
+
 from torchvision.transforms import InterpolationMode
 
+from wafer_ad.utils.constant import PROJECT_ROOT
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 class WaferDataset:
     def __init__(
@@ -81,7 +82,7 @@ class WaferDataset:
         x = Image.open(x)
         x = self.transform(x)
         if y == 0:
-            mask = torch.zeros([1, *self.input_size])
+            mask = torch.zeros([1, *self.img_size])
         else:
             mask = Image.open(mask)
             mask = self.transform_mask(mask)
@@ -91,3 +92,23 @@ class WaferDataset:
     def __len__(self):
         return len(self.x)
 
+
+def split_train_val(
+    dataset: torch.utils.data.Dataset,
+    val_ratio: float = 0.2,
+    seed: int = 42,
+) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
+    assert 0.0 < val_ratio < 1.0, "val_ratio must be between 0 and 1."
+
+    n_total = len(dataset)
+    n_val = int(n_total * val_ratio)
+    n_train = n_total - n_val
+
+    generator = torch.Generator().manual_seed(seed)
+
+    train_set, val_set = random_split(
+        dataset,
+        [n_train, n_val],
+        generator=generator,
+    )
+    return train_set, val_set
