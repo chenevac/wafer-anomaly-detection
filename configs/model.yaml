@@ -1,6 +1,12 @@
-img_size: !!python/tuple
-  - 512
-  - 512
-n_coupling_blocks: 4
-clamp: 3
-fc_internal: 1024
+c_conds:
+  - 64
+  - 64
+  - 64
+n_blocks:
+  - 2
+  - 5
+  - 8
+extractor_name: wide_resnet50_2
+pool_type: avg
+batch_size: 16
+n_epochs: 100

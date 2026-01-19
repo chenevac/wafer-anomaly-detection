@@ -13,6 +13,7 @@ uv add torch torchvision
 uv add efficientnet_pytorch
 uv add FrEIA
 uv add PyYaml
+uv add tqdm
 
 
 ## References

@@ -1,0 +1,93 @@
+import logging
+import os
+from PIL import Image
+import torch
+
+from pathlib import Path
+from typing import Tuple
+from torchvision import transforms
+
+from torchvision.transforms import InterpolationMode
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+class WaferDataset:
+    def __init__(
+        self, 
+        idx_dataset: int = 1,
+        is_for_train: bool = True,
+    ) -> None:
+        self.idx_dataset = idx_dataset
+        self.is_for_train = is_for_train
+        
+        self.dataset_folder = os.path.join(
+            PROJECT_ROOT, "data", "texture_ad", "wafer", str(self.idx_dataset),
+        )
+        
+        self.x, self.y, self.mask = self.load_dataset_folder()
+        
+        folder = os.path.join(self.dataset_folder, 'train', 'normal')
+        with Image.open(os.path.join(folder, os.listdir(folder)[0])) as img:
+            w, h = img.size
+            self.img_size: Tuple[int, int] = (h, w)
+         
+        
+        self.transform = transforms.Compose([
+            transforms.Resize(self.img_size, InterpolationMode.LANCZOS),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
+            ),
+        ])
+        
+        self.transform_mask = transforms.Compose([
+            transforms.Resize(self.img_size, InterpolationMode.NEAREST),
+            transforms.ToTensor()
+        ])
+        
+    def load_dataset_folder(self) -> Tuple[list, list, list]:
+        phase = 'train' if self.is_for_train else 'test'
+        x, y, mask = [], [], []
+
+        img_dir = os.path.join(self.dataset_folder, phase)
+        gt_dir = os.path.join(self.dataset_folder, 'ground_truth', "mask")
+
+        for img_type in sorted(os.listdir(img_dir)):  # "normal" or "anomalous" subfolders
+
+            img_type_dir = os.path.join(img_dir, img_type)
+            if not os.path.isdir(img_type_dir):
+                logging.warning(f'Skipped non-directory file: {img_type_dir}')
+                continue
+            img_fpath_list = sorted([os.path.join(img_type_dir, f) for f in os.listdir(img_type_dir)])
+            x.extend(img_fpath_list)
+
+            if img_type == 'normal':
+                y.extend([0] * len(img_fpath_list))
+                mask.extend([None] * len(img_fpath_list))
+            else:
+                y.extend([1] * len(img_fpath_list))
+                gt_fpath_list = sorted([os.path.join(gt_dir, f) for f in os.listdir(gt_dir)])
+                mask.extend(gt_fpath_list)
+
+        assert len(x) == len(y), "Number of samples and labels do not match."
+        assert len(x) == len(mask), "Number of samples and masks do not match."
+
+        return list(x), list(y), list(mask)
+    
+    def __getitem__(self, idx):
+        x, y, mask = self.x[idx], self.y[idx], self.mask[idx]
+        x = Image.open(x)
+        x = self.transform(x)
+        if y == 0:
+            mask = torch.zeros([1, *self.input_size])
+        else:
+            mask = Image.open(mask)
+            mask = self.transform_mask(mask)
+
+        return x, y, mask
+
+    def __len__(self):
+        return len(self.x)
+
