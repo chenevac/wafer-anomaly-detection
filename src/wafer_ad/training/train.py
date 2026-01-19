@@ -27,6 +27,7 @@ class Trainer:
         accumulate_grad_batches: int = 1,
         gradient_clip_val: Optional[Union[int, float]] = None,
         gradient_clip_norm_type: float = 2.,
+        dirpath_model_checkpoint: str = "/kaggle/working/"
     ) -> None:
         """_summary_
 
@@ -73,7 +74,7 @@ class Trainer:
         ]
         self.callbacks_kwargs: List[Dict[str, Any]] = [
             {
-                "dirpath": os.path.join("kaggle", "working", "output"),
+                "dirpath": dirpath_model_checkpoint,
                 "filename": "csflow",
                 "every_n_epochs": 4,
             },
