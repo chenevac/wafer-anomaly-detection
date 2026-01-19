@@ -112,8 +112,9 @@ class MSFlowModel(nn.Module):
         self.c_conds = c_conds
 
         self.extractor, self.output_channels = ExtractorFactory.build(extractor_name)
-        self.parallel_flows, self.fusion_flow = MSFlowFactory.build(self.output_channels, c_conds=c_conds, n_blocks=n_blocks)
-        
+        parallel_flows, self.fusion_flow = MSFlowFactory.build(self.output_channels, c_conds=c_conds, n_blocks=n_blocks)
+        self.parallel_flows = nn.ModuleList(parallel_flows)
+
         self.extractor.eval()  # MSFlow: extractor gelé
 
     def _get_pool(self):
