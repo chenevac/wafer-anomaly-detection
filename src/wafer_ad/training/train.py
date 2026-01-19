@@ -73,7 +73,7 @@ class Trainer:
         ]
         self.callbacks_kwargs: List[Dict[str, Any]] = [
             {
-                "dirpath": os.path.join(PROJECT_ROOT, "output"),
+                "dirpath": os.path.join("kaggle", "working", "output"),
                 "filename": "csflow",
                 "every_n_epochs": 4,
             },
