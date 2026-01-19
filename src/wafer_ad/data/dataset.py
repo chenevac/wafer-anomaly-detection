@@ -24,8 +24,8 @@ class WaferDataset:
         self.is_for_train = is_for_train
         
         self.dataset_folder = os.path.join(
-            PROJECT_ROOT if data_folder is None else data_folder, 
-            "data", "texture_ad", "wafer", str(self.idx_dataset),
+            os.path.join(PROJECT_ROOT, "data") if data_folder is None else data_folder, 
+            "texture_ad", "wafer", str(self.idx_dataset),
         )
         
         self.x, self.y, self.mask = self.load_dataset_folder()
