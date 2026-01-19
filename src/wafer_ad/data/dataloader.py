@@ -9,6 +9,7 @@ def get_data_loaders(
     batch_size: int = 16,
     validation_ratio: float = 0.2,
     seed: int = 42,
+    data_folder: str = None,
 ) -> Tuple[DataLoader,DataLoader,DataLoader]:
     """Create DataLoaders for training, validation, and testing.
     
@@ -22,11 +23,11 @@ def get_data_loaders(
         A tuple containing DataLoaders for training, validation, and testing.
     """
 
-    train_and_val_set = WaferDataset(idx_dataset=idx_dataset, is_for_train=True)
+    train_and_val_set = WaferDataset(idx_dataset=idx_dataset, is_for_train=True, data_folder=data_folder)
     train_set, val_set = split_train_val(train_and_val_set, val_ratio=validation_ratio, seed=seed)
     
     
-    test_set = WaferDataset(idx_dataset=idx_dataset, is_for_train=False)
+    test_set = WaferDataset(idx_dataset=idx_dataset, is_for_train=False, data_folder=data_folder)
 
     train_loader = DataLoader(
         train_set, 
