@@ -149,21 +149,16 @@ class MSFlowModel(nn.Module):
         return z_list, total_jac
     
     def save_state_dict(self, path: str) -> None:
-        """Save model `state_dict` to `path`."""
         if not path.endswith(".pth"):
-            logging.warning(
-                "It is recommended to use the .pth suffix for "
-                "state_dict files."
-            )
+            logging.warning("It is recommended to use the .pth suffix for state_dict files.")
         torch.save(self.state_dict(), path)
         logging.info("Model state_dict saved to %s", path)
-        
-    def load_state_dict(self, path: str,strict:bool=True) -> "MSFlowModel":
-        """Load model `state_dict` from `path`."""
-        logging.info("Loading weights from %s", path)
-        state_dict = torch.load(path,map_location="cpu")
-        self.load_state_dict(state_dict, strict=strict)
 
+
+    def load_weights(self, path: str, strict: bool = True) -> None:
+        logging.info("Loading weights from %s", path)
+        state_dict = torch.load(path, map_location="cpu")
+        super().load_state_dict(state_dict, strict=strict)
 
     @classmethod
     def from_config(
