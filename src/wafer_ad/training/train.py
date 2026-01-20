@@ -186,8 +186,8 @@ class Trainer:
         
         return {
             "AUC_ROC_DET" : roc_auc_score(gt_label_list, anomaly_score_list) * 100,
-            "AUC_LOC" : roc_auc_score(gt_mask.flatten(), anomaly_score_map_add.flatten()) * 100,
-            "AUC_PRO" : eval_seg_pro(gt_mask, np.asarray(anomaly_score_map_mul_list)),
+            "AUC_LOC" : roc_auc_score(gt_mask_list.flatten(), anomaly_score_map_add_list.flatten()) * 100,
+            "AUC_PRO" : eval_seg_pro(gt_mask_list, np.asarray(anomaly_score_map_mul_list)),
         }
         
 
