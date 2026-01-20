@@ -105,11 +105,15 @@ class MSFlowModel(nn.Module):
         c_conds, n_blocks,
         extractor_name: str = "wide_resnet50_2",
         pool_type: str = "avg",
+        top_k: float = 0.03,
+        img_size: Tuple[int, int] = (512, 512),
     ) -> None:
         super().__init__()
 
         self.pool_type = pool_type
         self.c_conds = c_conds
+        self.top_k = top_k
+        self.img_size = img_size
 
         self.extractor, self.output_channels = ExtractorFactory.build(extractor_name)
         parallel_flows, self.fusion_flow = MSFlowFactory.build(self.output_channels, c_conds=c_conds, n_blocks=n_blocks)
@@ -147,6 +151,70 @@ class MSFlowModel(nn.Module):
         total_jac = fuse_jac + sum(jac_list)
 
         return z_list, total_jac
+    
+    def post_process_forward(self, z_list, jac):
+        B = z_list[0].shape[0]
+
+        logp_maps = []
+        prop_maps = []
+
+        for z in z_list:
+            # (B, H, W)
+            outputs = -0.5 * torch.mean(z**2, dim=1)
+
+            # Log-probability map
+            logp_maps.append(
+                torch.nn.functional.interpolate(
+                    outputs.unsqueeze(1),
+                    size=self.img_size,
+                    mode="bilinear",
+                    align_corners=True,
+                ).squeeze(1)
+            )
+
+            # Probability map
+            outputs_norm = outputs - outputs.amax(dim=(-2, -1), keepdim=True)
+            prob_map = torch.exp(outputs_norm)
+
+            prop_maps.append(
+                torch.nn.functional.interpolate(
+                    prob_map.unsqueeze(1),
+                    size=self.img_size,
+                    mode="bilinear",
+                    align_corners=True,
+                ).squeeze(1)
+            )
+
+        # -----------------------------
+        # Multiplicative fusion
+        # -----------------------------
+        logp_map = sum(logp_maps)
+        logp_map -= logp_map.amax(dim=(-2, -1), keepdim=True)
+
+        prop_map_mul = torch.exp(logp_map)
+        anomaly_score_map_mul = (
+            prop_map_mul.amax(dim=(-2, -1), keepdim=True) - prop_map_mul
+        )
+
+        top_k = int(self.img_size[0] * self.img_size[1] * self.top_k)
+
+        anomaly_score = (
+            anomaly_score_map_mul
+            .reshape(B, -1)
+            .topk(top_k, dim=-1)[0]
+            .mean(dim=1)
+        )
+
+        # -----------------------------
+        # Additive fusion
+        # -----------------------------
+        prop_map_add = sum(prop_maps)
+        anomaly_score_map_add = (
+            prop_map_add.amax(dim=(-2, -1), keepdim=True) - prop_map_add
+        )
+
+        return anomaly_score, anomaly_score_map_add, anomaly_score_map_mul
+            
     
     def save_state_dict(self, path: str) -> None:
         if not path.endswith(".pth"):
