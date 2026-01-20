@@ -183,6 +183,8 @@ class Trainer:
                 gt_mask_list.extend(masks.cpu().data.numpy())
         gt_label = np.asarray(gt_label_list, dtype=np.bool)
         gt_mask = np.squeeze(np.asarray(gt_mask_list, dtype=np.bool), axis=1)
+        anomaly_score_map_add_list = np.asarray(anomaly_score_map_add_list)
+        anomaly_score_map_mul_list = np.asarray(anomaly_score_map_mul_list)
         
         return {
             "AUC_ROC_DET" : roc_auc_score(gt_label, anomaly_score_list) * 100,
