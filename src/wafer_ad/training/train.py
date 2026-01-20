@@ -13,8 +13,7 @@ from wafer_ad.training.callback import Callback, EarlyStopping, ModelCheckpoint
 from wafer_ad.training.loss import MSFlowLoss
 from wafer_ad.training.metric import AverageMeter
 from wafer_ad.utils.config import Config
-from wafer_ad.utils.constant import PROJECT_ROOT
-from wafer_ad.utils.devices import get_device
+from wafer_ad.utils.device import get_device
 from wafer_ad.utils.seed import init_seeds
 
 
@@ -160,6 +159,15 @@ class Trainer:
         self._update_val_metrics_history(total_loss.avg)
         self._call_callbacks("on_validation_epoch_end")
 
+    def test(self, dataloader: torch.utils.data.DataLoader) -> None:
+        self.model.eval()
+        if self.enable_progress_bar:
+            dataloader = tqdm(dataloader, total=len(dataloader))
+        with torch.no_grad():
+            for batch_idx, (images, labels, masks) in enumerate(dataloader):
+                images = images.to(self.device)
+                pass
+        
 
     def _reset_metrics(self) -> None:
         """Reset all metrics."""
