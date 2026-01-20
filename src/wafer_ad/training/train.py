@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Union
 import torch
 from wafer_ad.data.dataloader import get_data_loaders
 from wafer_ad.models.flow import MSFlowModel
-from wafer_ad.training.callback import Callback, EarlyStopping, ModelCheckpoint
+from wafer_ad.training.callback import Callback, EarlyStopping, ModelCheckpoint, Timer
 from wafer_ad.training.loss import MSFlowLoss
 from wafer_ad.training.metric import AverageMeter, eval_seg_pro
 from wafer_ad.utils.config import Config
@@ -72,6 +72,7 @@ class Trainer:
         self.callbacks: List[Callback] = [
             ModelCheckpoint,
             EarlyStopping,
+            Timer,
         ]
         self.callbacks_kwargs: List[Dict[str, Any]] = [
             {
@@ -81,7 +82,9 @@ class Trainer:
             },
             {
                 "monitor": "val_loss"
-            }
+            },
+            {
+            },
         ]
         
         self.loss_fn = MSFlowLoss()
@@ -90,7 +93,6 @@ class Trainer:
         self.metrics_kwargs = []
         self.metrics_history: Dict[str, List[float]]
         
-        self.start, self.end = None, None
         self.should_stop: bool = False
         self.current_epoch: int
         self.model: Optional[torch.nn.Module] = None
@@ -280,7 +282,6 @@ class Trainer:
         
     def on_fit_start(self, model: torch.nn.Module) -> None:
         logging.info("Start fitting the model.")
-        self.start = time.time()
         
         self.current_epoch = 1
         self.should_stop = False
@@ -307,9 +308,7 @@ class Trainer:
 
     def on_fit_end(self) -> None:
         self._call_callbacks("on_fit_end")
-        self.end = time.time()
-        time_delta = round((self.end - self.start) / 60, 2)
-        logging.info("Model successfully trained | %s epochs | %s min", self.current_epoch - 1, time_delta,)
+        logging.info("Model successfully trained in %s epochs.", self.current_epoch - 1,)
         
     def _call_callbacks(self, call_name: str) -> None:
         for callback in self.callbacks:

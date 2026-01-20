@@ -1,6 +1,7 @@
 import logging
 import operator
 import os
+import time
 from typing import Callable, Dict, Optional
 
 import numpy as np
@@ -235,3 +236,17 @@ class ModelCheckpoint(Callback):
                 " callback to use any of the following: "\
                 f"`{'`, `'.join(list(metrics.keys()))}`"
             raise RuntimeError(error_msg)
+
+
+class Timer(Callback):
+    """Callback that logs the time taken for training."""
+    def __init__(self) -> None:
+        super().__init__()
+        self.start_time: float
+        
+    def on_fit_start(self, trainer) -> None:
+        self.start_time = time.time()
+        
+    def on_fit_end(self, trainer) -> None:
+        elapsed_time = time.time() - self.start_time
+        logging.info(f"Training completed in {elapsed_time:.2f} seconds.")
