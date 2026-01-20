@@ -185,7 +185,7 @@ class Trainer:
         gt_mask = np.squeeze(np.asarray(gt_mask_list, dtype=np.bool), axis=1)
         
         return {
-            "AUC_ROC_DET" : roc_auc_score(gt_label, anomaly_score) * 100,
+            "AUC_ROC_DET" : roc_auc_score(gt_label_list, anomaly_score_list) * 100,
             "AUC_LOC" : roc_auc_score(gt_mask.flatten(), anomaly_score_map_add.flatten()) * 100,
             "AUC_PRO" : eval_seg_pro(gt_mask, np.asarray(anomaly_score_map_mul_list)),
         }
