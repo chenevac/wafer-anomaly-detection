@@ -4,6 +4,8 @@ import logging
 import os
 from pathlib import Path
 import time
+import numpy as np
+from sklearn.metrics import roc_auc_score
 from tqdm import tqdm
 from typing import Any, Dict, List, Optional, Union
 import torch
@@ -11,7 +13,7 @@ from wafer_ad.data.dataloader import get_data_loaders
 from wafer_ad.models.flow import MSFlowModel
 from wafer_ad.training.callback import Callback, EarlyStopping, ModelCheckpoint
 from wafer_ad.training.loss import MSFlowLoss
-from wafer_ad.training.metric import AverageMeter
+from wafer_ad.training.metric import AverageMeter, eval_seg_pro
 from wafer_ad.utils.config import Config
 from wafer_ad.utils.device import get_device
 from wafer_ad.utils.seed import init_seeds
@@ -159,14 +161,34 @@ class Trainer:
         self._update_val_metrics_history(total_loss.avg)
         self._call_callbacks("on_validation_epoch_end")
 
-    def test(self, dataloader: torch.utils.data.DataLoader) -> None:
+    def test(self, dataloader: torch.utils.data.DataLoader) -> Dict:
         self.model.eval()
         if self.enable_progress_bar:
             dataloader = tqdm(dataloader, total=len(dataloader))
+        gt_label_list = list()
+        gt_mask_list = list()
+        anomaly_score_list = list()
+        anomaly_score_map_add_list = list() 
+        anomaly_score_map_mul_list = list()
         with torch.no_grad():
             for batch_idx, (images, labels, masks) in enumerate(dataloader):
                 images = images.to(self.device)
-                pass
+                z_list, jac = self.model(images)
+                anomaly_score, anomaly_score_map_add, anomaly_score_map_mul = self.model.post_process_forward(z_list, jac)
+                
+                anomaly_score_list.extend(anomaly_score.cpu().data.numpy())
+                anomaly_score_map_add_list.extend(anomaly_score_map_add.cpu().data.numpy())
+                anomaly_score_map_mul_list.extend(anomaly_score_map_mul.cpu().data.numpy())
+                gt_label_list.extend(labels.cpu().data.numpy())
+                gt_mask_list.extend(masks.cpu().data.numpy())
+        gt_label = np.asarray(gt_label_list, dtype=np.bool)
+        gt_mask = np.squeeze(np.asarray(gt_mask_list, dtype=np.bool), axis=1)
+        
+        return {
+            "AUC_ROC_DET" : roc_auc_score(gt_label, anomaly_score) * 100,
+            "AUC_LOC" : roc_auc_score(gt_mask.flatten(), anomaly_score_map_add.flatten()) * 100,
+            "AUC_PRO" : eval_seg_pro(gt_mask, np.asarray(anomaly_score_map_mul_list)),
+        }
         
 
     def _reset_metrics(self) -> None:
