@@ -20,6 +20,13 @@ class WaferDataset:
         is_for_train: bool = True,
         idx_dataset: int = 1,
     ) -> None:
+        """Initialize the WaferDataset.
+        
+        Args:
+            data_folder: Path to the dataset folder.
+            is_for_train: Whether to load the training set or the test set.
+            idx_dataset: Index of the dataset.
+        """
         self.idx_dataset = idx_dataset
         self.is_for_train = is_for_train
         
@@ -98,6 +105,7 @@ def split_train_val(
     val_ratio: float = 0.2,
     seed: int = 42,
 ) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
+    """Split a dataset into training and validation sets."""
     assert 0.0 < val_ratio < 1.0, "val_ratio must be between 0 and 1."
 
     n_total = len(dataset)

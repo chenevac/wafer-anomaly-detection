@@ -1,16 +1,12 @@
 
 
 import logging
-import os
-from pathlib import Path
 import numpy as np
 from sklearn.metrics import roc_auc_score
 from tqdm import tqdm
 from typing import Any, Dict, List, Optional, Union
 import torch
 from torch.optim import Optimizer
-from wafer_ad.data.dataloader import get_data_loaders
-from wafer_ad.model.flow import MSFlowModel
 from wafer_ad.training.callback import Callback
 from wafer_ad.training.metric import AverageMeter, eval_seg_pro
 from wafer_ad.utils.configuration.configurable import Configurable
@@ -18,7 +14,6 @@ from wafer_ad.utils.configuration.training_config import TrainingConfig
 from wafer_ad.utils.device import get_device
 from wafer_ad.utils.other import nullable_union_list_object_to_list
 from wafer_ad.utils.path import resolve_path
-from wafer_ad.utils.seed import init_seeds
 from torch.nn.modules.loss import _Loss
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -42,14 +37,22 @@ class Trainer(Configurable):
         device: Optional[str] = None,
         enable_progress_bar: bool = True,
     ) -> None:
-        """_summary_
+        """Initializes the Trainer.
 
         Args:
+            optimizer: The optimizer to use.
+            loss_fn: The loss function to use.
+            callbacks: A list of callbacks to use during training.
+            schedulers: A list of learning rate schedulers to use during training.
+            optimizer_kwargs: Keyword arguments for the optimizer.
+            loss_fn_kwargs: Keyword arguments for the loss function.
+            callbacks_kwargs: A list of keyword arguments for each callback.
+            schedulers_kwargs: A list of keyword arguments for each scheduler.
             device: The device to use. If None, will use GPU if available.
             gradient_clip_val: The value at which to clip gradients.
                 Passing ``gradient_clip_val=None`` disables.
+            gradient_clip_norm_type: The norm type to use for gradient clipping.
             accumulate_grad_batches: accumulate_grad_batches: Accumulates grads every k batches.
-            learning_rate: Learning rate for the optimizer.
             enable_progress_bar: Whether to enable the progress bar.
         """
         logging.info("Initializing trainer.")
@@ -86,6 +89,9 @@ class Trainer(Configurable):
         """Fit one epoch.
 
         Iterates over all batches in the dataloader (one epoch).
+        
+        Args:
+            dataloader: A :class:`torch.utils.data.DataLoader`
         """
         self._call_callbacks("on_train_epoch_start")
         self._reset_metrics()
@@ -225,7 +231,7 @@ class Trainer(Configurable):
             model: Model to fit.
             train_dataloader: A :class:`torch.utils.data.DataLoader`
                 specifying training samples.
-            val_dataloader: A :class:`torch.utils.data.DataLoader`
+            valid_dataloader: A :class:`torch.utils.data.DataLoader`
                 specifying validation samples.
             evaluate_every_n_epochs: Evaluate every n epochs on validation set.
             n_epochs: Number of epochs to fit.
@@ -263,6 +269,11 @@ class Trainer(Configurable):
         setattr(self, to_be_resolved + "_kwargs", list())
         
     def on_fit_start(self, model: torch.nn.Module) -> None:
+        """Called at the start of fitting.
+        
+        Args:
+            model: The model to fit.
+        """
         logging.info("Start fitting the model.")
         
         self.current_epoch = 1
@@ -289,15 +300,29 @@ class Trainer(Configurable):
         self._call_callbacks("on_fit_start")
 
     def on_fit_end(self) -> None:
+        """Called at the end of fitting."""
         self._call_callbacks("on_fit_end")
         logging.info("Model successfully trained in %s epochs.", self.current_epoch - 1,)
         
     def _call_callbacks(self, call_name: str) -> None:
+        """Call all callbacks with the given method name.
+        
+        Args:
+            call_name: The name of the method to call on each callback.
+        """
         for callback in self.callbacks:
             fn = getattr(callback, call_name)
             fn(self)
         
     def save_checkpoint(self, filepath: str) -> None:
+        """Save model checkpoint to `filepath`.
+        
+        Args:
+            filepath: Path to save the checkpoint to.
+            
+        Raises:
+            AttributeError: If no model is attached to the Trainer.
+        """
         filepath = resolve_path(filepath)
         if self.model is None:
             raise AttributeError(
@@ -312,7 +337,14 @@ class Trainer(Configurable):
         cls,
         source: Union[TrainingConfig, str],
     ) -> Any:
-        """Construct `Model` instance from `source` configuration."""
+        """Construct `Model` instance from `source` configuration.
+        
+         Args:
+            source: A `TrainingConfig` instance or the path to a YAML file
+        
+        Returns:
+            An instance of `Trainer` constructed from `source`.
+        """
         if isinstance(source, str):
             source = TrainingConfig.load(source)
         return source._construct_trainer()
