@@ -5,11 +5,12 @@ from wafer_ad.data.dataset import WaferDataset, split_train_val
 
 
 def get_data_loaders(
+    data_folder: str,
     idx_dataset: int = 1,
     batch_size: int = 16,
     validation_ratio: float = 0.2,
     seed: int = 42,
-    data_folder: str = None,
+    
 ) -> Tuple[DataLoader,DataLoader,DataLoader]:
     """Create DataLoaders for training, validation, and testing.
     

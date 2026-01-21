@@ -17,6 +17,7 @@ from wafer_ad.utils.configuration.configurable import Configurable
 from wafer_ad.utils.configuration.training_config import TrainingConfig
 from wafer_ad.utils.device import get_device
 from wafer_ad.utils.other import nullable_union_list_object_to_list
+from wafer_ad.utils.path import resolve_path
 from wafer_ad.utils.seed import init_seeds
 from torch.nn.modules.loss import _Loss
 from torch.optim.lr_scheduler import LRScheduler
@@ -297,6 +298,7 @@ class Trainer(Configurable):
             fn(self)
         
     def save_checkpoint(self, filepath: str) -> None:
+        filepath = resolve_path(filepath)
         if self.model is None:
             raise AttributeError(
                 "Saving a checkpoint is only possible if a model is attached "
@@ -314,19 +316,3 @@ class Trainer(Configurable):
         if isinstance(source, str):
             source = TrainingConfig.load(source)
         return source._construct_trainer()
-    
-      
-      
-if __name__ == "__main__":
-    init_seeds(42)
-    project_root = Path(__file__).resolve().parents[3]
-    model = MSFlowModel.from_config(os.path.join(project_root, "configs", "model.yaml"))
-    train_loader, val_loader, test_loader = get_data_loaders(idx_dataset=1)
-    trainer = Trainer()
-    
-    trainer.train(
-        model=model,
-        train_dataloader=train_loader,
-        valid_dataloader=val_loader,
-    )
-

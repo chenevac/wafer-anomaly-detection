@@ -30,8 +30,8 @@ class TrainingPipeline:
         )
         
         
-        self.trainer = Trainer.from_config()
-        self.model = MSFlowModel.from_config(model_config)
+        self.trainer = Trainer.from_config(self.train_config)
+        self.model = MSFlowModel.from_config(self.model_config)
         
     def run(self) -> None:
         """Run the training and testing pipeline."""

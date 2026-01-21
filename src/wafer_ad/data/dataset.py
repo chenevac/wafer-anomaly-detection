@@ -10,22 +10,21 @@ from torch.utils.data import random_split
 
 from torchvision.transforms import InterpolationMode
 
-from wafer_ad.utils.constant import PROJECT_ROOT
+from wafer_ad.utils.path import resolve_path
 
 
 class WaferDataset:
     def __init__(
         self, 
-        idx_dataset: int = 1,
+        data_folder: str,
         is_for_train: bool = True,
-        data_folder: str = None,
+        idx_dataset: int = 1,
     ) -> None:
         self.idx_dataset = idx_dataset
         self.is_for_train = is_for_train
         
-        self.dataset_folder = os.path.join(
-            PROJECT_ROOT, "data", "texture-ad", "wafer", str(self.idx_dataset),
-        ) if data_folder is None else data_folder
+        self.dataset_folder = resolve_path(data_folder)
+
         
         self.x, self.y, self.mask = self.load_dataset_folder()
         

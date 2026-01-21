@@ -12,8 +12,8 @@ arguments:
     - {dirpath: /kaggle/working/, filename: csflow}
     - {}
   schedulers:
-    - '! class torch.optim.lr_scheduler LinearLR'
-    - '! class torch.optim.lr_scheduler MultiStepLR'
+    - '!class torch.optim.lr_scheduler LinearLR'
+    - '!class torch.optim.lr_scheduler MultiStepLR'
   schedulers_kwargs:
     - {start_factor: 0.1, end_factor: 1.0, total_iters: 500}
     - {milestones: [5000, 10000, 20000], gamma: 0.1}
