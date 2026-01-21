@@ -37,8 +37,8 @@ class TrainingPipeline:
         """Run the training and testing pipeline."""
         self.trainer.train(
             model=self.model,
-            train_loader=self.train_loader,
-            val_loader=self.val_loader,
+            train_dataloader=self.train_loader,
+            valid_dataloader=self.val_loader,
             n_epochs=self.train_config.n_epochs,
         )
         self.trainer.test(self.test_loader)
