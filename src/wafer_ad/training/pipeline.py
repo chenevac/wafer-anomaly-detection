@@ -1,5 +1,6 @@
 
 
+import logging
 from typing import Union
 from wafer_ad.data.dataloader import get_data_loaders
 from wafer_ad.model.flow import MSFlowModel
@@ -41,4 +42,6 @@ class TrainingPipeline:
             valid_dataloader=self.val_loader,
             n_epochs=self.train_config.n_epochs,
         )
-        self.trainer.test(self.test_loader)
+        scores = self.trainer.test(self.test_loader)
+        for score_name, score_value in scores.items():
+            logging.info(f"Test {score_name}: {score_value}")
