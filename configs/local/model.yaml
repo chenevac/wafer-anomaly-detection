@@ -1,0 +1,16 @@
+arguments:
+  c_conds:
+    - 64
+    - 64
+    - 64
+  n_blocks:
+    - 2
+    - 5
+    - 8
+  extractor_name: wide_resnet50_2
+  pool_type: avg
+  top_k: 0.03
+  img_size:
+    - 512
+    - 512
+class_name: MSFlowModel

@@ -1,0 +1,23 @@
+arguments:
+  optimizer: '!class torch.optim Adam'
+  optimizer_kwargs: {lr: 1e-4}
+  accumulate_grad_batches: 4
+  loss_fn: '!class wafer_ad.training.loss MSFlowLoss'
+  callbacks:
+    - '!class wafer_ad.training.callback EarlyStopping'
+    - '!class wafer_ad.training.callback ModelCheckpoint'
+    - '!class wafer_ad.training.callback Timer'
+  callbacks_kwargs:
+    - {monitor: val_loss}
+    - {dirpath: $WAFERAD/output/, filename: csflow}
+    - {}
+  schedulers:
+    - '! class torch.optim.lr_scheduler LinearLR'
+    - '! class torch.optim.lr_scheduler MultiStepLR'
+  schedulers_kwargs:
+    - {start_factor: 0.1, end_factor: 1.0, total_iters: 500}
+    - {milestones: [5000, 10000, 20000], gamma: 0.1}
+class_name: Trainer
+n_epochs: 100
+batch_size: 16
+data_folder: "$WAFERAD/data/texture-ad/texture_ad/wafer/1"
