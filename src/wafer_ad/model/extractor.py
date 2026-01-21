@@ -3,7 +3,7 @@ from typing import List, Tuple
 
 from torch.nn import Module
 
-from wafer_ad.models.resnet.resnet import resnet18, resnet34, resnet50, resnext50_32x4d, wide_resnet50_2
+from wafer_ad.model.resnet.resnet import resnet18, resnet34, resnet50, resnext50_32x4d, wide_resnet50_2
 
 
 class ExtractorFactory:

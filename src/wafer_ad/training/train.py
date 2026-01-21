@@ -3,32 +3,43 @@
 import logging
 import os
 from pathlib import Path
-import time
 import numpy as np
 from sklearn.metrics import roc_auc_score
 from tqdm import tqdm
 from typing import Any, Dict, List, Optional, Union
 import torch
+from torch.optim import Optimizer
 from wafer_ad.data.dataloader import get_data_loaders
-from wafer_ad.models.flow import MSFlowModel
-from wafer_ad.training.callback import Callback, EarlyStopping, ModelCheckpoint, Timer
-from wafer_ad.training.loss import MSFlowLoss
+from wafer_ad.model.flow import MSFlowModel
+from wafer_ad.training.callback import Callback
 from wafer_ad.training.metric import AverageMeter, eval_seg_pro
-from wafer_ad.utils.config import Config
+from wafer_ad.utils.configuration.configurable import Configurable
+from wafer_ad.utils.configuration.training_config import TrainingConfig
 from wafer_ad.utils.device import get_device
+from wafer_ad.utils.other import nullable_union_list_object_to_list
 from wafer_ad.utils.seed import init_seeds
+from torch.nn.modules.loss import _Loss
+from torch.optim.lr_scheduler import LRScheduler
 
-
-class Trainer:
+class Trainer(Configurable):
     def __init__(
         self,
-        device: Optional[str] = None,
-        enable_progress_bar: bool = True,
-        learning_rate: float = 1e-4,
-        accumulate_grad_batches: int = 1,
+        optimizer: Union[Optimizer, type],
+        loss_fn: Union[_Loss, type],
+        callbacks: Optional[Union[Callback, List[Callback]]] = None,
+        schedulers: Optional[Union[LRScheduler, List[LRScheduler]]] = None,
+        
+        optimizer_kwargs: Optional[Dict[str, Any]] = None,
+        loss_fn_kwargs: Optional[Dict[str, Any]] = None,
+        callbacks_kwargs: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
+        schedulers_kwargs: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
+        
         gradient_clip_val: Optional[Union[int, float]] = None,
         gradient_clip_norm_type: float = 2.,
-        dirpath_model_checkpoint: str = "/kaggle/working/"
+
+        accumulate_grad_batches: int = 1,
+        device: Optional[str] = None,
+        enable_progress_bar: bool = True,
     ) -> None:
         """_summary_
 
@@ -47,47 +58,17 @@ class Trainer:
         self.device: str = device if device is not None else get_device()
         self.accumulate_grad_batches: int = accumulate_grad_batches
         
-        # TODO: make optimizer, schedulers and callbacks configurable
-        self.optimizer = torch.optim.Adam
-        self.optimizer_kwargs: Dict[str, Any] = {"lr": learning_rate}
+        self.optimizer: Union[Optimizer, type] = optimizer
+        self.optimizer_kwargs: Dict[str, Any] = (optimizer_kwargs if optimizer_kwargs is not None else {})
         
-        self.schedulers: List[torch.optim.lr_scheduler._LRScheduler] = [
-            torch.optim.lr_scheduler.LinearLR,
-            torch.optim.lr_scheduler.MultiStepLR
-        ]
-        self.schedulers_kwargs: List[Dict[str, Any]] = [
-            # Warmup sur les 500 premiers steps
-            {
-                "start_factor": 0.1,
-                "end_factor": 1.0,
-                "total_iters": 500,
-            },
-            # Décroissance après certains steps
-            {
-                "milestones": [5_000, 10_000, 20_000],
-                "gamma": 0.1,
-            },
-        ]
+        self.schedulers: List[Union[LRScheduler, type]] = nullable_union_list_object_to_list(schedulers)
+        self.schedulers_kwargs: List[Dict[str, Any]] = nullable_union_list_object_to_list(schedulers_kwargs)
         
-        self.callbacks: List[Callback] = [
-            ModelCheckpoint,
-            EarlyStopping,
-            Timer,
-        ]
-        self.callbacks_kwargs: List[Dict[str, Any]] = [
-            {
-                "dirpath": dirpath_model_checkpoint,
-                "filename": "csflow",
-                "every_n_epochs": 4,
-            },
-            {
-                "monitor": "val_loss"
-            },
-            {
-            },
-        ]
+        self.callbacks: List[Union[Callback, type]] = nullable_union_list_object_to_list(callbacks)
+        self.callbacks_kwargs: List[Dict[str, Any]] = nullable_union_list_object_to_list(callbacks_kwargs)
         
-        self.loss_fn = MSFlowLoss()
+        self.loss_fn: Union[_Loss, type] = loss_fn
+        self.loss_fn_kwargs: Dict[str, Any] = (loss_fn_kwargs if loss_fn_kwargs is not None else {})
         
         self.metrics = []
         self.metrics_kwargs = []
@@ -324,20 +305,15 @@ class Trainer:
             )
         self.model.save_state_dict(filepath)
        
-    @classmethod 
-    def from_config(cls, source: Union[str, Config]) -> "Trainer":
+    @classmethod
+    def from_config(
+        cls,
+        source: Union[TrainingConfig, str],
+    ) -> Any:
         """Construct `Model` instance from `source` configuration."""
-        logging.info("Creating Trainer from config.")
         if isinstance(source, str):
-            source = Config.from_yaml(source)
-        return cls(
-            device=source.device,
-            enable_progress_bar=source.enable_progress_bar,
-            learning_rate=source.learning_rate,
-            accumulate_grad_batches=source.accumulate_grad_batches,
-            gradient_clip_val=source.gradient_clip_val,
-            gradient_clip_norm_type=source.gradient_clip_norm_type,
-        )
+            source = TrainingConfig.load(source)
+        return source._construct_trainer()
     
       
       

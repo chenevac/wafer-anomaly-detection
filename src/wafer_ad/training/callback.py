@@ -245,8 +245,28 @@ class Timer(Callback):
         self.start_time: float
         
     def on_fit_start(self, trainer) -> None:
+        """Called when fit begins.
+
+        Records the start time of the training process.
+
+        Args:
+            trainer: trainer instance
+
+        Note:
+            The trainer is not used but kept for callback signature compatibility.
+        """
         self.start_time = time.time()
         
     def on_fit_end(self, trainer) -> None:
+        """Called when fit ends.
+
+        Calculates and logs the total training time.
+
+        Args:
+            trainer: trainer instance
+
+        Note:
+            The trainer is not used but kept for callback signature compatibility
+        """
         elapsed_time = time.time() - self.start_time
         logging.info(f"Training completed in {elapsed_time:.2f} seconds.")

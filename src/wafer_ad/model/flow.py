@@ -1,15 +1,16 @@
 import logging
 import math
-from typing import List, Tuple, Union
+from typing import Any, List, Tuple, Union
 
 import torch
 from torch import nn
 import FrEIA.framework as Ff
 import FrEIA.modules as Fm
 
-from wafer_ad.models.FrEIA import FusionCouplingLayer
-from wafer_ad.models.extractor import ExtractorFactory
-from wafer_ad.utils.config import Config
+from wafer_ad.model.FrEIA import FusionCouplingLayer
+from wafer_ad.model.extractor import ExtractorFactory
+from wafer_ad.utils.configuration.configurable import Configurable
+from wafer_ad.utils.configuration.model_config import ModelConfig
 
 
 
@@ -99,7 +100,7 @@ class MSFlowFactory:
 
 
 
-class MSFlowModel(nn.Module):
+class MSFlowModel(nn.Module, Configurable):
     def __init__(
         self,
         c_conds, n_blocks,
@@ -231,26 +232,12 @@ class MSFlowModel(nn.Module):
     @classmethod
     def from_config(
         cls,
-        source: Union[Config, str],
-    ) -> "MSFlowModel":
-        """Create MSFlowModel from config file.
-
-        Args:
-            source: Either a Config object or a path to a config file.
-        """
+        source: Union[ModelConfig, str],
+    ) -> Any:
+        """Construct `Model` instance from `source` configuration."""
         if isinstance(source, str):
-            logging.info("Loading MSFlowModel config from %s", source)
-            config = Config.from_yaml(source)
-        else:
-            config = source
-
-        logging.info("Creating MSFlowModel from config.")
-        return cls(
-            c_conds=config.c_conds,
-            n_blocks=config.n_blocks,
-            extractor_name=config.extractor_name,
-            pool_type=config.pool_type,
-        )
+            source = ModelConfig.load(source)
+        return source._construct_model()
         
     def train(self, mode=True):
         super().train(mode)  # <-- met à jour self.training et tous les sous-modules par défaut
