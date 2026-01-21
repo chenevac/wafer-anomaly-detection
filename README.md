@@ -17,7 +17,7 @@ uv add tqdm
 uv add scikit-learn
 uv add scikit-image
 uv add torcheval
-
+uv add matplotlib
 
 
 ## References
