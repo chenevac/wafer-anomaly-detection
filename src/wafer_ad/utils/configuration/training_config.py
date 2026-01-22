@@ -35,7 +35,7 @@ class TrainingConfig(BaseConfig):
         cls, obj: Any
     ) -> Any:
         if isinstance(obj, TrainingConfig):
-            from wafer_ad.training.train import Trainer
+            from wafer_ad.training.trainer import Trainer
 
             return Trainer.from_config(obj)
         elif isinstance(obj, str) and obj.startswith("!class"):

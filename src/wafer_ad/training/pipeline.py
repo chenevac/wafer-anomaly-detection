@@ -2,11 +2,13 @@
 
 import logging
 from typing import Union
+
 from wafer_ad.data.dataloader import get_data_loaders
 from wafer_ad.model.flow import MSFlowModel
-from wafer_ad.training.train import Trainer
+from wafer_ad.training.trainer import Trainer
 from wafer_ad.utils.configuration.model_config import ModelConfig
 from wafer_ad.utils.configuration.training_config import TrainingConfig
+from wafer_ad.inference.test import test
 
 
 class TrainingPipeline:
@@ -42,6 +44,18 @@ class TrainingPipeline:
             valid_dataloader=self.val_loader,
             n_epochs=self.train_config.n_epochs,
         )
-        scores = self.trainer.test(self.test_loader)
-        for score_name, score_value in scores.items():
-            logging.info(f"Test {score_name}: {score_value}")
+        imagewise_retrieval_metrics, pixelwise_retrieval_metrics_add, pixelwise_retrieval_metrics_mul = test(
+            model=self.model,
+            dataloader=self.test_loader,
+            enable_progress_bar=True,
+            device=self.trainer.device,
+        )
+        logging.info("Image-wise retrieval metrics:")
+        for score_name, score_value in imagewise_retrieval_metrics.items():
+            logging.info(f"{score_name}: {score_value}")
+        logging.info("Pixel-wise retrieval metrics (addition):")
+        for score_name, score_value in pixelwise_retrieval_metrics_add.items():
+            logging.info(f"{score_name}: {score_value}")
+        logging.info("Pixel-wise retrieval metrics (multiplication):")
+        for score_name, score_value in pixelwise_retrieval_metrics_mul.items():
+            logging.info(f"{score_name}: {score_value}")

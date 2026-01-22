@@ -1,8 +1,9 @@
 
 
+from typing import Dict, List, Union
 import numpy as np
-from sklearn.metrics import auc
-from skimage.measure import label, regionprops
+from sklearn import metrics
+
 
 class AverageMeter:
     def __init__(self):
@@ -21,63 +22,78 @@ class AverageMeter:
         self.avg = self.sum / self.count
 
 
-def eval_seg_pro(
-    gt_mask: np.ndarray,
-    anomaly_score_map: np.ndarray,
-    max_step: int = 800,
-    expect_fpr: float = 0.3,
-) -> float:
+def compute_imagewise_retrieval_metrics(
+    anomaly_prediction_weights: Union[np.ndarray, List[float]],
+    anomaly_ground_truth_labels: Union[np.ndarray, List[int]]
+) -> Dict[str, float]:
     """
-    Optimized PRO AUC evaluation.
+    Computes retrieval statistics (AUROC, FPR, TPR).
 
     Args:
-        gt_mask: (N, H, W) binary ground-truth masks
-        anomaly_score_map: (N, H, W) anomaly score maps
-        max_step: number of thresholds
-        expect_fpr: maximum false positive rate
-
-    Returns:
-        PRO AUC score in percentage
+        anomaly_prediction_weights: [np.array or list] [N] Assignment weights
+                                    per image. Higher indicates higher
+                                    probability of being an anomaly.
+        anomaly_ground_truth_labels: [np.array or list] [N] Binary labels - 1
+                                    if image is an anomaly, 0 if not.
     """
+    fpr, tpr, thresholds = metrics.roc_curve(
+        anomaly_ground_truth_labels, anomaly_prediction_weights
+    )
+    auroc = metrics.roc_auc_score(
+        anomaly_ground_truth_labels, anomaly_prediction_weights
+    )
+    return {"auroc": auroc, "fpr": fpr, "tpr": tpr, "threshold": thresholds}
 
-    # Thresholds
-    min_th = anomaly_score_map.min()
-    max_th = anomaly_score_map.max()
-    thresholds = np.linspace(min_th, max_th, max_step)
 
-    # Precompute regions once (MAJOR speed-up)
-    regions_per_image = [
-        [region.coords for region in regionprops(label(mask))]
-        for mask in gt_mask
-    ]
+def compute_pixelwise_retrieval_metrics(
+    anomaly_segmentations: Union[List[np.ndarray], np.ndarray], 
+    ground_truth_masks: Union[List[np.ndarray], np.ndarray]
+) -> Dict[str, float]:
+    """
+    Computes pixel-wise statistics (AUROC, FPR, TPR) for anomaly segmentations
+    and ground truth segmentation masks.
 
-    inverse_masks = 1 - gt_mask
-    inv_sum = inverse_masks.sum()
+    Args:
+        anomaly_segmentations: [list of np.arrays or np.array] [NxHxW] Contains
+                                generated segmentation masks.
+        ground_truth_masks: [list of np.arrays or np.array] [NxHxW] Contains
+                            predefined ground truth segmentation masks
+    """
+    if isinstance(anomaly_segmentations, list):
+        anomaly_segmentations = np.stack(anomaly_segmentations)
+    if isinstance(ground_truth_masks, list):
+        ground_truth_masks = np.stack(ground_truth_masks)
 
-    pros_mean = []
-    fprs = []
+    flat_anomaly_segmentations = anomaly_segmentations.ravel()
+    flat_ground_truth_masks = ground_truth_masks.ravel()
 
-    for th in thresholds:
-        binary_score_maps = anomaly_score_map > th
+    fpr, tpr, thresholds = metrics.roc_curve(
+        flat_ground_truth_masks.astype(int), flat_anomaly_segmentations
+    )
+    auroc = metrics.roc_auc_score(
+        flat_ground_truth_masks.astype(int), flat_anomaly_segmentations
+    )
 
-        pro = []
-        for binary_map, regions in zip(binary_score_maps, regions_per_image):
-            for coords in regions:
-                tp_pixels = binary_map[coords[:, 0], coords[:, 1]].sum()
-                pro.append(tp_pixels / len(coords))
+    precision, recall, thresholds = metrics.precision_recall_curve(
+        flat_ground_truth_masks.astype(int), flat_anomaly_segmentations
+    )
+    F1_scores = np.divide(
+        2 * precision * recall,
+        precision + recall,
+        out=np.zeros_like(precision),
+        where=(precision + recall) != 0,
+    )
 
-        pros_mean.append(np.mean(pro) if len(pro) > 0 else 0.0)
+    optimal_threshold = thresholds[np.argmax(F1_scores)]
+    predictions = (flat_anomaly_segmentations >= optimal_threshold).astype(int)
+    fpr_optim = np.mean(predictions > flat_ground_truth_masks)
+    fnr_optim = np.mean(predictions < flat_ground_truth_masks)
 
-        fprs.append(
-            np.logical_and(inverse_masks, binary_score_maps).sum() / inv_sum
-        )
-
-    pros_mean = np.asarray(pros_mean)
-    fprs = np.asarray(fprs)
-
-    # FPR filtering and rescaling
-    idx = fprs < expect_fpr
-    fprs = (fprs[idx] - fprs[idx].min()) / (fprs[idx].max() - fprs[idx].min())
-    pros_mean = pros_mean[idx]
-
-    return auc(fprs, pros_mean) * 100
+    return {
+        "auroc": auroc,
+        "fpr": fpr,
+        "tpr": tpr,
+        "optimal_threshold": optimal_threshold,
+        "optimal_fpr": fpr_optim,
+        "optimal_fnr": fnr_optim,
+    }
