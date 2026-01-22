@@ -1,14 +1,12 @@
 
 
 import logging
-import numpy as np
-from sklearn.metrics import roc_auc_score
 from tqdm import tqdm
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 import torch
 from torch.optim import Optimizer
 from wafer_ad.training.callback import Callback
-from wafer_ad.training.metric import AverageMeter, compute_imagewise_retrieval_metrics, compute_pixelwise_retrieval_metrics, eval_seg_pro
+from wafer_ad.training.metric import AverageMeter
 from wafer_ad.utils.configuration.configurable import Configurable
 from wafer_ad.utils.configuration.training_config import TrainingConfig
 from wafer_ad.utils.device import get_device
