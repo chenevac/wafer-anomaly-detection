@@ -12,7 +12,7 @@ def test(
     enable_progress_bar: bool = True,
     device: str = "cpu",
 ) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float]]:
-    assert dataloader.dataset.is_for_train, "Dataloader should be for test/evaluation, not for training."
+    assert not dataloader.dataset.is_for_train, "Dataloader should be for test/evaluation, not for training."
     model.eval()
     if enable_progress_bar:
         dataloader = tqdm(dataloader, total=len(dataloader))

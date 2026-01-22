@@ -47,6 +47,7 @@ def get_data_loaders(
         test_set, 
         pin_memory=True, 
         batch_size=batch_size, 
+        is_for_train=False,
         shuffle=False,
     )
     
