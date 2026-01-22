@@ -291,6 +291,9 @@ class Trainer(Configurable):
         if isinstance(self.optimizer, type):
             logging.info("Instanciation of optimizer %s", self.optimizer)
             self.optimizer = self.optimizer(self.trainable_params, **self.optimizer_kwargs)
+        if isinstance(self.loss_fn, type):
+            logging.info("Instanciation of loss function %s", self.loss_fn)
+            self.loss_fn = self.loss_fn(**self.loss_fn_kwargs)
         self.optimizer.zero_grad()
         
         self._resolve_uninstanciated("callbacks")
