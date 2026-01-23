@@ -1,7 +1,8 @@
 import logging
 import math
-from typing import Any, List, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
+import numpy as np
 import torch
 from torch import nn
 import FrEIA.framework as Ff
@@ -77,6 +78,7 @@ class MSFlowFactory:
         c_conds: List[int],  # [64, 64, 64]
         n_blocks: List[int],  # [2, 5, 8]
         clamp_alpha: float = 1.9,
+        seed: Optional[int] = 1,
     ) -> Tuple[List[Ff.SequenceINN], Ff.GraphINN]:
         parallel_flows = []
         for c_feat, c_cond, n_block in zip(c_feats, c_conds, n_blocks):
@@ -89,15 +91,13 @@ class MSFlowFactory:
         for idx, c_feat in enumerate(c_feats):
             nodes.append(Ff.InputNode(c_feat, 1, 1, name='input{}'.format(idx)))
         for idx in range(n_inputs):
-            nodes.append(Ff.Node(nodes[-n_inputs], Fm.PermuteRandom, {}, name='permute_{}'.format(idx)))
+            nodes.append(Ff.Node(nodes[-n_inputs], Fm.PermuteRandom, {"seed": seed+idx}, name='permute_{}'.format(idx)))
         nodes.append(Ff.Node([(nodes[-n_inputs+i], 0) for i in range(n_inputs)], FusionCouplingLayer, {'clamp': clamp_alpha}, name='fusion flow'))
         for idx, c_feat in enumerate(c_feats):
             nodes.append(Ff.OutputNode(eval('nodes[-idx-1].out{}'.format(idx)), name='output_{}'.format(idx)))
         fusion_flow = Ff.GraphINN(nodes)
 
         return parallel_flows, fusion_flow
-
-
 
 
 class MSFlowModel(nn.Module, Configurable):
@@ -224,9 +224,49 @@ class MSFlowModel(nn.Module, Configurable):
         logging.info("Model state_dict saved to %s", path)
 
 
-    def load_weights(self, path: str, strict: bool = True) -> None:
+    def load_state_dict(self, path: str, strict: bool = True) -> None:
         logging.info("Loading weights from %s", path)
         state_dict = torch.load(path, map_location="cpu")
+        
+        # Réorganiser les poids des PermuteFixed dans fusion_flow
+        # FrEIA peut changer l'ordre des modules entre instanciations
+        permute_keys = [k for k in state_dict.keys() if 'fusion_flow.module_list' in k and '.perm' in k]
+        
+        if permute_keys:
+            # Extraire les poids de permutation du checkpoint
+            saved_perms = {}
+            for key in permute_keys:
+                if key.endswith('.perm') or key.endswith('.perm_inv'):
+                    saved_perms[key] = state_dict[key]
+            
+            # Trouver les correspondances basées sur la taille des tenseurs
+            current_perms = {}
+            for name, param in self.named_parameters():
+                if 'fusion_flow.module_list' in name and ('.perm' in name):
+                    current_perms[name] = param
+            
+            # Créer un mapping taille -> clés
+            saved_by_size = {}
+            for key, tensor in saved_perms.items():
+                size = tensor.shape[0]
+                param_type = 'perm' if key.endswith('.perm') else 'perm_inv'
+                if size not in saved_by_size:
+                    saved_by_size[size] = {}
+                saved_by_size[size][param_type] = (key, tensor)
+            
+            # Remapper les poids selon la taille
+            for current_key, current_param in current_perms.items():
+                size = current_param.shape[0]
+                param_type = 'perm' if current_key.endswith('.perm') else 'perm_inv'
+                
+                if size in saved_by_size and param_type in saved_by_size[size]:
+                    saved_key, saved_tensor = saved_by_size[size][param_type]
+                    state_dict[current_key] = saved_tensor
+                    # Marquer comme utilisé
+                    del saved_by_size[size][param_type]
+                    if not saved_by_size[size]:
+                        del saved_by_size[size]
+        
         super().load_state_dict(state_dict, strict=strict)
 
     @classmethod
