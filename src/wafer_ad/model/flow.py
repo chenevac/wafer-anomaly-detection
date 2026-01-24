@@ -154,16 +154,36 @@ class MSFlowModel(nn.Module, Configurable):
         return z_list, total_jac
     
     def post_process_forward(self, z_list, jac):
+        """
+        Post-traitement des sorties du forward pour calculer les scores d'anomalie.
+        
+        Args:
+            z_list: Liste de tenseurs latents de différentes échelles issus du forward
+            jac: Jacobien total (non utilisé ici mais gardé pour compatibilité)
+        
+        Returns:
+            anomaly_score: Score d'anomalie moyen par image (numpy array)
+            anomaly_score_map_add: Carte d'anomalie avec fusion additive (numpy array)
+            anomaly_score_map_mul: Carte d'anomalie avec fusion multiplicative (numpy array)
+        """
+        # Récupère la taille du batch depuis le premier tenseur de la liste
         B = z_list[0].shape[0]
 
+        # Initialisation des listes pour stocker les cartes de log-probabilité et de probabilité
         logp_maps = []
         prop_maps = []
 
+        # Traitement de chaque échelle
         for z in z_list:
-            # (B, H, W)
+            # Calcul des outputs : log-densité gaussienne simplifiée
+            # -0.5 * ||z||^2 correspond à log(exp(-0.5 * ||z||^2)) dans une gaussienne standard
+            # mean(z**2, dim=1) fait la moyenne sur le canal pour obtenir une carte 2D (B, H, W)
             outputs = -0.5 * torch.mean(z**2, dim=1)
 
-            # Log-probability map
+            # ===== Carte de log-probabilité =====
+            # Redimensionne la carte à la taille d'entrée de l'image
+            # unsqueeze(1) ajoute une dimension canal pour interpolate : (B, H, W) -> (B, 1, H, W)
+            # squeeze(1) retire cette dimension après interpolation : (B, 1, H', W') -> (B, H', W')
             logp_maps.append(
                 torch.nn.functional.interpolate(
                     outputs.unsqueeze(1),
@@ -173,10 +193,17 @@ class MSFlowModel(nn.Module, Configurable):
                 ).squeeze(1)
             )
 
-            # Probability map
-            outputs_norm = outputs - outputs.amax(dim=(-2, -1), keepdim=True)
+            # ===== Carte de probabilité =====
+            # Normalisation : soustrait le maximum pour éviter l'overflow dans exp()
+            # max(-1, keepdim=True)[0] trouve le max sur la dimension W
+            # max(-2, keepdim=True)[0] trouve ensuite le max sur la dimension H
+            # Résultat : le max global de chaque image du batch
+            outputs_norm = outputs - outputs.max(-1, keepdim=True)[0].max(-2, keepdim=True)[0]
+            
+            # Conversion en probabilités : exp(log_prob) donne des valeurs dans [0, 1]
             prob_map = torch.exp(outputs_norm)
 
+            # Redimensionne la carte de probabilité à la taille d'entrée
             prop_maps.append(
                 torch.nn.functional.interpolate(
                     prob_map.unsqueeze(1),
@@ -186,35 +213,65 @@ class MSFlowModel(nn.Module, Configurable):
                 ).squeeze(1)
             )
 
-        # -----------------------------
-        # Multiplicative fusion
-        # -----------------------------
+        # =============================
+        # Fusion multiplicative
+        # =============================
+        # Somme des log-probabilités = produit des probabilités (log(a*b) = log(a) + log(b))
         logp_map = sum(logp_maps)
-        logp_map -= logp_map.amax(dim=(-2, -1), keepdim=True)
+        
+        # Normalisation de la carte de log-probabilité fusionnée
+        # Soustrait le max pour stabilité numérique
+        logp_map -= logp_map.max(-1, keepdim=True)[0].max(-2, keepdim=True)[0]
 
+        # Conversion en probabilités : exp(sum(log_prob)) = produit des probabilités
         prop_map_mul = torch.exp(logp_map)
+        
+        # Calcul de la carte d'anomalie multiplicative
+        # Les zones normales ont une haute probabilité -> faible score d'anomalie
+        # Les zones anormales ont une faible probabilité -> score d'anomalie élevé
+        # On fait : max - valeur_actuelle pour inverser
         anomaly_score_map_mul = (
-            prop_map_mul.amax(dim=(-2, -1), keepdim=True) - prop_map_mul
+            prop_map_mul.max(-1, keepdim=True)[0].max(-2, keepdim=True)[0] - prop_map_mul
         )
 
+        # Calcul du nombre de pixels à considérer pour le top-k
+        # top_k est un pourcentage (ex: 0.03 = 3% des pixels)
         top_k = int(self.img_size[0] * self.img_size[1] * self.top_k)
 
+        # Calcul du score d'anomalie final par image
+        # reshape(B, -1) : aplatit la carte 2D en vecteur 1D
+        # topk(top_k, dim=-1)[0] : sélectionne les top_k scores les plus élevés
+        # mean(dim=1) : moyenne des top_k scores pour obtenir un score par image
+        # detach().cpu().numpy() : convertit en numpy array pour compatibilité
         anomaly_score = (
             anomaly_score_map_mul
             .reshape(B, -1)
             .topk(top_k, dim=-1)[0]
             .mean(dim=1)
+            .detach()
+            .cpu()
+            .numpy()
         )
 
-        # -----------------------------
-        # Additive fusion
-        # -----------------------------
-        prop_map_add = sum(prop_maps)
+        # =============================
+        # Fusion additive
+        # =============================
+        # Somme directe des cartes de probabilité (fusion additive)
+        # Conversion en numpy pour cohérence avec la fonction originale
+        prop_map_add = sum(prop_maps).detach().cpu().numpy()
+        
+        # Calcul de la carte d'anomalie additive
+        # max(axis=(1, 2), keepdims=True) : trouve le max sur H et W, garde les dimensions
+        # Soustraction pour obtenir le score d'anomalie (max - valeur)
         anomaly_score_map_add = (
-            prop_map_add.amax(dim=(-2, -1), keepdim=True) - prop_map_add
+            prop_map_add.max(axis=(1, 2), keepdims=True) - prop_map_add
         )
 
-        return anomaly_score, anomaly_score_map_add, anomaly_score_map_mul
+        # Retour des résultats
+        # anomaly_score : (B,) score moyen par image
+        # anomaly_score_map_add : (B, H, W) carte d'anomalie fusion additive
+        # anomaly_score_map_mul : (B, H, W) carte d'anomalie fusion multiplicative
+        return anomaly_score, anomaly_score_map_add, anomaly_score_map_mul.detach().cpu().numpy()
             
     
     def save_state_dict(self, path: str) -> None:

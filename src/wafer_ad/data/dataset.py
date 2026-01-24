@@ -18,16 +18,13 @@ class WaferDataset:
         self, 
         data_folder: str,
         is_for_train: bool = True,
-        idx_dataset: int = 1,
     ) -> None:
         """Initialize the WaferDataset.
         
         Args:
             data_folder: Path to the dataset folder.
             is_for_train: Whether to load the training set or the test set.
-            idx_dataset: Index of the dataset.
         """
-        self.idx_dataset = idx_dataset
         self.is_for_train = is_for_train
         
         self.dataset_folder = resolve_path(data_folder)
