@@ -1,6 +1,5 @@
 
 
-import logging
 from typing import Union
 
 from wafer_ad.data.dataloader import get_data_loaders

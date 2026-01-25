@@ -14,6 +14,7 @@ def test(
 ) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float]]:
     assert not dataloader.dataset.is_for_train, "Dataloader should be for test/evaluation, not for training."
     model.eval()
+    model.to(device)
     if enable_progress_bar:
         dataloader = tqdm(dataloader, total=len(dataloader))
     gt_label_list = list()
