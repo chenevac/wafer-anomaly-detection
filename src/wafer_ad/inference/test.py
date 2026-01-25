@@ -22,14 +22,14 @@ def test(
     anomaly_score_map_add_list = list() 
     anomaly_score_map_mul_list = list()
     with torch.no_grad():
-        for batch_idx, (images, labels, masks) in enumerate(dataloader):
+        for (images, labels, masks) in dataloader:
             images = images.to(device)
             z_list, jac = model(images)
             anomaly_score, anomaly_score_map_add, anomaly_score_map_mul = model.post_process_forward(z_list, jac)
             
-            anomaly_score_list.extend(anomaly_score.cpu().data.numpy())
-            anomaly_score_map_add_list.extend(anomaly_score_map_add.cpu().data.numpy())
-            anomaly_score_map_mul_list.extend(anomaly_score_map_mul.cpu().data.numpy())
+            anomaly_score_list.extend(anomaly_score)
+            anomaly_score_map_add_list.extend(anomaly_score_map_add)
+            anomaly_score_map_mul_list.extend(anomaly_score_map_mul)
             gt_label_list.extend(labels.cpu().data.numpy())
             gt_mask_list.extend(masks.cpu().data.numpy())
     gt_label = np.asarray(gt_label_list, dtype=np.bool)
@@ -37,7 +37,8 @@ def test(
     anomaly_score_map_add_list = np.asarray(anomaly_score_map_add_list)
     anomaly_score_map_mul_list = np.asarray(anomaly_score_map_mul_list)
     
-    return compute_imagewise_retrieval_metrics(anomaly_score_list, gt_label), \
-        compute_pixelwise_retrieval_metrics(gt_mask, anomaly_score_map_add_list ), \
-        compute_pixelwise_retrieval_metrics(gt_mask, anomaly_score_map_mul_list )
-    
+    return {
+        "imagewise_retrieval_metrics": compute_imagewise_retrieval_metrics(anomaly_score_list, gt_label),
+        "pixelwise_retrieval_metrics_add": compute_pixelwise_retrieval_metrics(anomaly_score_map_add_list, gt_mask),
+        "pixelwise_retrieval_metrics_mul": compute_pixelwise_retrieval_metrics(anomaly_score_map_mul_list, gt_mask),
+    }

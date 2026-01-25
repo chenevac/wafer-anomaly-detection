@@ -9,6 +9,7 @@ from wafer_ad.training.trainer import Trainer
 from wafer_ad.utils.configuration.model_config import ModelConfig
 from wafer_ad.utils.configuration.training_config import TrainingConfig
 from wafer_ad.inference.test import test
+from wafer_ad.utils.figure import display_roc
 
 
 class TrainingPipeline:
@@ -44,18 +45,28 @@ class TrainingPipeline:
             valid_dataloader=self.val_loader,
             n_epochs=self.train_config.n_epochs,
         )
-        imagewise_retrieval_metrics, pixelwise_retrieval_metrics_add, pixelwise_retrieval_metrics_mul = test(
+        metrics = test(
             model=self.model,
             dataloader=self.test_loader,
             enable_progress_bar=True,
             device=self.trainer.device,
         )
-        logging.info("Image-wise retrieval metrics:")
-        for score_name, score_value in imagewise_retrieval_metrics.items():
-            logging.info(f"{score_name}: {score_value}")
-        logging.info("Pixel-wise retrieval metrics (addition):")
-        for score_name, score_value in pixelwise_retrieval_metrics_add.items():
-            logging.info(f"{score_name}: {score_value}")
-        logging.info("Pixel-wise retrieval metrics (multiplication):")
-        for score_name, score_value in pixelwise_retrieval_metrics_mul.items():
-            logging.info(f"{score_name}: {score_value}")
+        display_roc(
+            metrics["imagewise_retrieval_metrics"]["fpr"],
+            metrics["imagewise_retrieval_metrics"]["tpr"],
+            title="Image-wise ROC Curve"
+        )
+        print("Image-wise AUROC:", metrics["imagewise_retrieval_metrics"]["auroc"])
+        
+        display_roc(
+            metrics["pixelwise_retrieval_metrics_add"]["fpr"],
+            metrics["pixelwise_retrieval_metrics_add"]["tpr"],
+            title="Pixel-wise ROC Curve (Additive)",
+        )
+        print("Pixel-wise AUROC (Additive):", metrics["pixelwise_retrieval_metrics_add"]["auroc"])
+        display_roc(
+            metrics["pixelwise_retrieval_metrics_mul"]["fpr"],
+            metrics["pixelwise_retrieval_metrics_mul"]["tpr"],
+            title="Pixel-wise ROC Curve (Multiplicative)",
+        )
+        print("Pixel-wise AUROC (Multiplicative):", metrics["pixelwise_retrieval_metrics_mul"]["auroc"])
