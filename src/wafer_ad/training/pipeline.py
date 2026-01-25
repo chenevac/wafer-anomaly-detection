@@ -9,7 +9,7 @@ from wafer_ad.training.trainer import Trainer
 from wafer_ad.utils.configuration.model_config import ModelConfig
 from wafer_ad.utils.configuration.training_config import TrainingConfig
 from wafer_ad.inference.test import test
-from wafer_ad.utils.figure import display_roc
+from wafer_ad.utils.figure import display_learning_curve, display_roc
 
 
 class TrainingPipeline:
@@ -45,6 +45,12 @@ class TrainingPipeline:
             valid_dataloader=self.val_loader,
             n_epochs=self.train_config.n_epochs,
         )
+        display_learning_curve(
+            train_losses=self.trainer.metrics_history["train_loss"],
+            val_losses=self.trainer.metrics_history["val_loss"],
+            title="Learning Curve",
+        )
+        
         metrics = test(
             model=self.model,
             dataloader=self.test_loader,
